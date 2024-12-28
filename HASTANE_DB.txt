@@ -1,0 +1,127 @@
+CREATE database HASTANE_DB
+USE HASTANE_DB
+create table HASTALAR (
+HASTA_ID int identity (1,1) primary key,
+HASTA_ADI nvarchar(25),
+HASTA_SOYADI nvarchar(25),
+DOGUM_TARIHI date,
+CINSIYET nvarchar(1),
+TEL_NO nvarchar(15),)
+Create table DOKTORLAR(
+DOKTOR_ID int identity (1,1) primary key,
+DOKTOR_ADI nvarchar (25),
+DOKTOR_SOYADI nvarchar (25),
+UZMANLIK nvarchar (100),
+TEL_NO nvarchar(15))
+CREATE TABLE POLIKLINIK(
+POLIKLINIK_ID int identity (1,1) primary key,
+POLIKLINIK_ADI nvarchar(100),
+ACIKLAMA nvarchar (250),)
+CREATE TABLE RANDEVU(
+RANDEVU_ID int identity (1,1) primary key,
+HASTA_ID int foreign key references HASTALAR (HASTA_ID),
+DOKTOR_ID int foreign key references DOKTORLAR(DOKTOR_ID),
+POLIKLINIK_ID int foreign key references POLIKLINIK(POLIKLINIK_ID),
+RANDEVU_TARIHI date,
+ACIKLAMA nvarchar (250))
+CREATE TABLE PERSONEL(
+PERSONEL_ID int identity (1,1) primary key,
+PERSONEL_ADI nvarchar (25),
+PERSONEL_SOYADI nvarchar(25),
+DEPARTMAN nvarchar(100),
+TEL_NO nvarchar (15))
+INSERT INTO HASTALAR
+(HASTA_ADI,HASTA_SOYADI,DOGUM_TARIHI,CINSIYET,TEL_NO) values
+('Ali','Kaya','1980-06-06','E','3214569865'),
+('Damla','Yılmaz','1999-03-08','K','3456789872'),
+('Ali','Güneş','1982-08-07','E','8769876556'),
+('Deniz','Yıldırım','1986-02-01','K','2435546754'),
+('Enes','Caner','1987-03-04','E','3456782735')
+INSERT INTO DOKTORLAR
+(DOKTOR_ADI,DOKTOR_SOYADI,UZMANLIK,TEL_NO) values
+('Cengiz','Elif','Kardiyoloji', '4567657847'),
+('Dilara','Güler','Nöroloji','4580698774'),
+('Canan','Kayık','Dermatoloji','4675894762'),
+('Arda','Çakır', 'KBB','4583836567'),
+('Başak','Damar','Ortopedi','4539374689')
+INSERT INTO POLIKLINIK
+(POLIKLINIK_ADI,ACIKLAMA) values
+('Kardiyoloji','Kalp ve Damar'),
+('Nöroloji','Beyin ve sinir'),
+('Dermatoloji','Cilt Hatalıkları'),
+('KBB','Kulak,Burun,Boğaz'),
+('Ortopedi','Kemik ve kas')
+INSERT INTO PERSONEL
+(PERSONEL_ADI,PERSONEL_SOYADI,DEPARTMAN,TEL_NO) values
+('Selin','Bulut','Halkla İlişkiler','5466789896'),
+('Kemal','Topal','Temizlik','5365783456'),
+('Pelin','Kaya','Hemşirelik','5467893452'),
+('Taner','Sönmez','Güvenlik','5456745637'),
+('Sena','Yakar','Yönetim','5456787896')
+
+DECLARE @i int=0
+while @i<10000
+BEGIN
+INSERT INTO
+RANDEVU(HASTA_ID,DOKTOR_ID,POLIKLINIK_ID,RANDEVU_TARIHI,ACIKLAMA) 
+values
+(FLOOR(RAND()*5)+ 1,
+FLOOR(RAND()*5)+ 1,
+FLOOR(RAND()*5)+ 1, DATEADD(DAY,FLOOR(RAND()*365),GETDATE()),'Rutin Kontrol')
+set @i=@i+1
+end
+SELECT COUNT(*) FROM RANDEVU
+CREATE PROCEDURE PoliklinikRandevularıDESC
+@POLIKLINIK_ID int
+as 
+begin
+SELECT R.RANDEVU_ID , HASTA_ADI as HastaAdi,
+DOKTOR_ADI as DoktorAdi, R.RANDEVU_TARIHI from RANDEVU R
+join HASTALAR H on R. HASTA_ID= H.HASTA_ID
+join DOKTORLAR D on R. DOKTOR_ID = D.DOKTOR_ID
+WHERE R. POLIKLINIK_ID=@POLIKLINIK_ID ORDER BY R. RANDEVU_TARIHI DESC
+end
+exec PoliklinikRandevularıDESC 1
+CREATE TABLE RANDEVU_LOG(
+LOG_ID int identity (1,1) primary key,
+RANDEVU_ID int,
+SilinmeTarihi DATETIME)
+
+CREATE trigger trg_RandevuDelete
+on RANDEVU after DELETE
+as begin
+insert into RANDEVU_LOG(RANDEVU_ID, SilinmeTarihi)
+select deleted.RANDEVU_ID,GETDATE() from deleted
+end 
+DELETE from RANDEVU WHERE RANDEVU_ID=1
+CREATE view vw_Tum_Randevular
+as
+SELECT 
+R.RANDEVU_ID, HASTA_ADI as HastaAdi, DOKTOR_ADI as DoktorAdi ,P.POLIKLINIK_ADI,R.RANDEVU_TARIHI
+from RANDEVU R
+join HASTALAR H on R.HASTA_ID=H.HASTA_ID
+join DOKTORLAR D on R.DOKTOR_ID=D.DOKTOR_ID
+join POLIKLINIK P on R.POLIKLINIK_ID=P.POLIKLINIK_ID
+SELECT *FROM vw_Tum_Randevular
+CREATE FUNCTION 
+dbo.fn_HastaRandevuSayısı (@HASTA_ID int) returns int
+as
+begin 
+declare @RandevuSayisi int 
+select @RandevuSayisi = COUNT (*) from RANDEVU WHERE HASTA_ID=@HASTA_ID 
+RETURN
+@RandevuSayisi 
+end 
+SELECT dbo.fn_HastaRandevuSayısı (2)
+BEGIN TRANSACTION 
+BEGIN TRY 
+	INSERT INTO 
+	RANDEVU(HASTA_ID,DOKTOR_ID,POLIKLINIK_ID,RANDEVU_TARIHI,ACIKLAMA) values
+	(9999,3,4,GETDATE(),'Rutin Kontrol')
+	COMMIT
+	PRINT 'Transaction başarılı ve commit edildi'
+	end try
+	begin catch
+	rollback
+	print 'Transaction başarısız ve rollback yapıldı'
+	end catch
